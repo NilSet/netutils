@@ -81,15 +81,18 @@ impl Udp {
         if self.header.checksum.data == 0 {
             true
         } else {
-            let protocol = n16::new(0x11);
             let mut header = self.header;
             header.checksum.data = 0;
             let mut computed_checksum: u16 = Checksum::compile(unsafe {
+                // Pseudo header
                 Checksum::sum(src_addr.bytes.as_ptr() as usize, src_addr.bytes.len()) +
                 Checksum::sum(dst_addr.bytes.as_ptr() as usize, dst_addr.bytes.len()) +
-                Checksum::sum((&protocol as *const n16) as usize, mem::size_of::<n16>()) +
-                Checksum::sum((&self.header.len as *const n16) as usize, mem::size_of::<n16>()) +
+                Checksum::sum((&0u8 as *const u8) as usize, mem::size_of::<u8>()) +
+                Checksum::sum((&0x11u8 as *const u8) as usize, mem::size_of::<u8>()) +
+                Checksum::sum((&header.len as *const n16) as usize, mem::size_of::<n16>()) +
+                // Real header
                 Checksum::sum((&header as *const UdpHeader) as usize, mem::size_of::<UdpHeader>()) +
+                // Data
                 Checksum::sum(self.data.as_ptr() as usize, self.data.len())
             });
             println!("computed checksum: {:x}", computed_checksum);
@@ -117,13 +120,43 @@ fn upd_header_computation() {
             dst: dest_port,
             len: n16::new(10),
             checksum: Checksum {
-                data: 0xfe1d
+                data: 0x9bc6
             }
         },
         data: "1\n".as_bytes().to_vec()
     };
 
-    assert!(datagram1.is_valid(&addr, &addr));
+    let datagram2 = Udp {
+        header: UdpHeader {
+            src: source_port,
+            dst: dest_port,
+            len: n16::new(10),
+            checksum: Checksum {
+                data: 0x6ac6
+            }
+        },
+        data: "b\n".as_bytes().to_vec()
+    };
+
+    let datagram3 = Udp {
+        header: UdpHeader {
+            src: source_port,
+            dst: dest_port,
+            len: n16::new(13),
+            checksum: Checksum {
+                data: 0xff06
+            }
+        },
+        data: "aabb\n".as_bytes().to_vec()
+    };
+
+    let res1 = datagram1.is_valid(&addr, &addr);
+    let res2 = datagram2.is_valid(&addr, &addr);
+    let res3 = datagram3.is_valid(&addr, &addr);
+
+    assert!(res1);
+    assert!(res2);
+    assert!(res3);
 
     println!("Trying to compute UDP header");
 }
