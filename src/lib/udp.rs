@@ -87,8 +87,7 @@ impl Udp {
                 // Pseudo header
                 Checksum::sum(src_addr.bytes.as_ptr() as usize, src_addr.bytes.len()) +
                 Checksum::sum(dst_addr.bytes.as_ptr() as usize, dst_addr.bytes.len()) +
-                Checksum::sum((&0u8 as *const u8) as usize, mem::size_of::<u8>()) +
-                Checksum::sum((&0x11u8 as *const u8) as usize, mem::size_of::<u8>()) +
+                Checksum::sum((&0x1100u16 as *const u16) as usize, mem::size_of::<u16>()) +
                 Checksum::sum((&header.len as *const n16) as usize, mem::size_of::<n16>()) +
                 // Real header
                 Checksum::sum((&header as *const UdpHeader) as usize, mem::size_of::<UdpHeader>()) +
@@ -110,53 +109,37 @@ impl Udp {
 
 #[test]
 fn upd_header_computation() {
+    //Test packet generated with `sendip -v -p ipv4 -p udp -ud 1234 -d 'fubar' localhost`
+    //hexdump of captured ethernet frame:
+    //0000000 c3d4 a1b2 0002 0004 0000 0000 0000 0000
+    //0000010 0000 0004 0001 0000 7189 5813 a709 0003
+    //0000020 002f 0000 002f 0000 0000 0000 0000 0000
+    //0000030 0000 0000 0008 0045 2100 d2de 0000 11ff
+    //0000040 f6de 007f 0100 007f 0100 0000 d204 0d00
+    //0000050 28c2 7566 6162 0072                    
+    //0000057 
     let addr = Ipv4Addr::from_str("127.0.0.1");
-    let source_port = n16::new(54110);
-    let dest_port = n16::new(25000);
+    let source_port = n16::new(0);
+    let dest_port = n16::new(1234);
 
     let datagram1 = Udp {
         header: UdpHeader {
             src: source_port,
             dst: dest_port,
-            len: n16::new(10),
-            checksum: Checksum {
-                data: 0x9bc6
-            }
-        },
-        data: "1\n".as_bytes().to_vec()
-    };
-
-    let datagram2 = Udp {
-        header: UdpHeader {
-            src: source_port,
-            dst: dest_port,
-            len: n16::new(10),
-            checksum: Checksum {
-                data: 0x6ac6
-            }
-        },
-        data: "b\n".as_bytes().to_vec()
-    };
-
-    let datagram3 = Udp {
-        header: UdpHeader {
-            src: source_port,
-            dst: dest_port,
             len: n16::new(13),
             checksum: Checksum {
-                data: 0xff06
+                data: 0x28c2
             }
         },
-        data: "aabb\n".as_bytes().to_vec()
+        data: "fubar".as_bytes().to_vec()
     };
-
-    let res1 = datagram1.is_valid(&addr, &addr);
-    let res2 = datagram2.is_valid(&addr, &addr);
-    let res3 = datagram3.is_valid(&addr, &addr);
+    for byte in datagram1.to_bytes() {
+        print!("{:02x}", byte);
+    }
+    println!("");
+   let res1 = datagram1.is_valid(&addr, &addr);
 
     assert!(res1);
-    assert!(res2);
-    assert!(res3);
 
     println!("Trying to compute UDP header");
 }
